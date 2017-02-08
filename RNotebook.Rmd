@@ -7,19 +7,65 @@ This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
-```{r}
+```{r, echo=TRUE}
 library(ggplot2)
 library(dplyr)
 library(tidyr)
+library(maptools)
 
 data.raw <- read.csv("DelayedFlights.csv", stringsAsFactors = TRUE, header = TRUE, na.strings=c("","-","NA"))
 #glimpse into the data
 glimpse(data.raw)
 #look at the missing values
-missingValues <- colSums(sapply(data.raw, is.na))
-missingValues[missingValues > 0]
+findMissingValues <- function(df) {
+missingValues <- colSums(sapply(df, is.na))
+missingValues[missingValues > 0]  
+}
+
+unique(data.raw$Origin)
+findMissingValues(data.raw)
+```
+
+```{r}
+#Unique ("Origin", "Dest") Pair
+col_names <- c("Origin", "Dest", "Month")
+dots <- lapply(col_names, as.symbol)
+
+data.summarized <- data.raw %>% group_by_(.dots = dots) %>% 
+  summarise(ArrDelayMean = mean(ArrDelay, na.rm = TRUE)
+  ,DepDelayMean = mean(DepDelay, na.rm = TRUE)
+  ,Dist = mean(Distance, na.rm = TRUE)
+  ,DivertedSum = sum(Diverted, na.rm = TRUE)
+  ,CarrierDelayMean = mean(CarrierDelay, na.rm = TRUE)
+  ,WeatherDelayMean = mean(WeatherDelay, na.rm = TRUE)
+  ,NASDelayMean = mean(NASDelay, na.rm = TRUE)
+  ,SecurityDelayMean = mean(SecurityDelay, na.rm = TRUE)
+  ,LateAircraftDelayMean = mean(LateAircraftDelay, na.rm = TRUE))
+head(data.summarized, 5)
+
+findMissingValues(data.summarized)
+
+summary(data.summarized)
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+```{r}
+DepDelayOutlier <- boxplot.stats(data.summarized$DepDelayMean)$out
+
+DepDelay <- data.summarized$DepDelayMean - DepDelayOutlier
+length(data.summarized$DepDelayMean)
+length(DepDelayOutlier)
+length(DepDelay)
+
+gor=readShapeSpatial('st99_d00.shp')
+plot(gor)
+summary(gor)
+gor@data$NAME
+
+ggplot(data = filter(data.summarized, Month == 1), aes(x = Origin, y = Dest)) +
+  geom_tile(aes(fill = log(DepDelayMean)), color="white") +
+  scale_fill_gradient(low="white", high="red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), axis.ticks = element_blank())
+```
 
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
